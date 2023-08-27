@@ -1,0 +1,20 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  name: e2e-fbc-component
+  namespace: dev-release-team-tenant
+  annotations:
+    image.redhat.com/generate: 'true'
+    skip-initial-checks: 'false'
+spec:
+  application: e2e-fbc-application
+  componentName: e2e-fbc-component
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  source:
+    git:
+      url: 'https://github.com/redhat-appstudio-qe/fbc-sample-repo'
+  targetPort: 50051
