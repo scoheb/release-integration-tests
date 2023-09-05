@@ -1,0 +1,19 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleaseStrategy
+metadata:
+  name: file-updates-test-rs
+  namespace: managed-release-team-tenant
+spec:
+  pipeline: deploy-release
+  bundle: quay.io/hacbs-release/pipeline-deploy-release:main
+  policy: file-updates-test-policy
+  params:
+    - name: extraConfigGitUrl
+      value: https://github.com/scoheb/strategy-configs.git
+    - name: extraConfigPath
+      value: mvp.yaml
+    - name: extraConfigRevision
+      value: main
+  serviceAccount: release-service-account
+---

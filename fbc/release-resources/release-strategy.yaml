@@ -2,9 +2,9 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: ReleaseStrategy
 metadata:
   name: e2e-fbc-strategy
-  namespace: 
+  namespace: managed-release-team-tenant
 spec:
-  bundle: 'quay.io/hacbs-release/pipeline-fbc-release:main'
+  bundle: 'quay.io/scoheb/pipeline-fbc-release:debug-ir'
   params:
     - name: fromIndex
       value: 'quay.io/scoheb/fbc-index-testing:latest'

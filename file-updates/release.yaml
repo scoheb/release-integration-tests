@@ -1,0 +1,8 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: mvp-manual-release
+  namespace: user1-tenant
+spec:
+  snapshot: appstudio-976vr
+  releasePlan: demo

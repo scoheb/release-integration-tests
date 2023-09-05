@@ -1,0 +1,8 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  name: file-updates-test-manual-release
+  namespace: dev-release-team-tenant
+spec:
+  snapshot: fileupdatestest-7cx8t
+  releasePlan: file-updates-test-rp

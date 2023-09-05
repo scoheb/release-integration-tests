@@ -1,16 +1,18 @@
 #!/usr/bin/env sh
 
-# trap teardown EXIT
+trap teardown EXIT
 
-DEV_KUBECONFIG="--kubeconfig=/home/kasemalem/rhtap_kubeconfigs/stage_dev_release_kubelogin"
-MANAGED_KUBECONFIG="--kubeconfig=/home/kasemalem/rhtap_kubeconfigs/stage_managed_release_kubelogin"
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+DEV_KUBECONFIG="--kubeconfig=$SCRIPTDIR/stage_dev_release_kubelogin"
+MANAGED_KUBECONFIG="--kubeconfig=$SCRIPTDIR/stage_managed_release_kubelogin"
 
 MANAGED_NAMESPACE="managed-release-team-tenant"
-APPLICATION_NAME="e2e-fbc-application"
-COMPONENT_NAME="e2e-fbc-component"
-RELEASE_PLAN_NAME="e2e-fbc-releaseplan"
-RELEASE_PLAN_ADMISSION_NAME="e2e-fbc-releaseplanadmission"
-RELEASE_STRATEGY_NAME="e2e-fbc-strategy"
+APPLICATION_NAME="fileupdatestest"
+COMPONENT_NAME="fileupdatestest-component"
+RELEASE_PLAN_NAME="file-updates-test-rp"
+RELEASE_PLAN_ADMISSION_NAME="file-updates-test-rpa"
+RELEASE_STRATEGY_NAME="file-updates-test-rs"
 TIMEOUT_SECONDS=600
 
 function setup() {
@@ -31,6 +33,8 @@ function setup() {
     echo "Creating ReleasePlanAdmission"
     kubectl apply -f release-resources/release-plan-admission.yaml "$MANAGED_KUBECONFIG"
 
+    echo "Creating EnterpriseContractPolicy"
+    kubectl apply -f release-resources/ec-policy.yaml "$MANAGED_KUBECONFIG"
 }
 
 function teardown() {
@@ -39,7 +43,6 @@ function teardown() {
     kubectl delete pr -l "appstudio.openshift.io/application="$APPLICATION_NAME",pipelines.appstudio.openshift.io/type="$type",appstudio.openshift.io/component="$COMPONENT_NAME"" "$DEV_KUBECONFIG"
     kubectl delete pr -l "appstudio.openshift.io/application="$APPLICATION_NAME",pipelines.appstudio.openshift.io/type="$type"" "$MANAGED_KUBECONFIG"
 
-    #kubectl delete release -o=jsonpath="{.spec.releasePlan}{'\n'}{end}"
     kubectl delete release "$DEV_KUBECONFIG" -o=jsonpath='{.items[?(@.spec.releasePlan=="$RELEASE_PLAN_NAME")].metadata.name}'
     kubectl delete releaseplan "$RELEASE_PLAN_NAME" "$DEV_KUBECONFIG"
     kubectl delete releaseplanadmission "$RELEASE_PLAN_ADMISSION_NAME" "$MANAGED_KUBECONFIG"
@@ -57,6 +60,7 @@ function teardown() {
 function wait_for_pr_to_complete() {
     local kube_config
     local type=$1
+    local success_reason=$2
     local start_time=$(date +%s)
 
     if [ "$type" = "release" ]; then
@@ -80,7 +84,9 @@ function wait_for_pr_to_complete() {
             echo "PipelineRun "$name" failed."
             return 1
         fi
-        
+
+        echo "$status $reason $type"
+
         if [ "$status" = "True" ] && [ "$reason" = "Completed" ] && [ "$type" = "Succeeded" ]; then
             echo "PipelineRun "$name" succeeded."
             return 0
@@ -102,10 +108,10 @@ echo "Seting up resoures"
 setup
 
 echo "Wait for build PipelineRun to finish"
-wait_for_pr_to_complete "build"
+wait_for_pr_to_complete "build" "Completed"
 
 echo "Wait for release PipelineRun to finish"
-wait_for_pr_to_complete "release"
+wait_for_pr_to_complete "release" "Succeeded"
 
 echo "Waiting for the Release to be updated"
 sleep 10
@@ -119,8 +125,10 @@ release_status=$(kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpa
 release_reason=$(kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpath='{.status.conditions[?(@.type=="Released")].reason}')
 
 if [ "$release_status" = "True" ] && [ "$release_reason" = "Failed"]; then
-    echo "Rlease "$release_name" Released succeeded."
+    echo "Release "$release_name" Released succeeded."
 else 
-    echo "Rlease "$release_name" Released Failed."
+    echo "Release "$release_name" Released Failed."
+    kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpath='{.status}' | jq .
+    trap - EXIT
 fi
 
