@@ -1,0 +1,1269 @@
+---
+$schema: /app-sre/saas-file-2.yml
+labels:
+  service: ocm
+name: osd-fleet-manager
+description: SaaS file for OSD Fleet Manager
+app:
+  $ref: /services/ocm/osd-fleet-manager/app.yml
+pipelinesProvider:
+  $ref: /services/ocm/pipelines/tekton.ocm-pipelines.appsrep05ue1.yaml
+slack:
+  workspace:
+    $ref: /dependencies/slack/redhat-internal.yml
+  channel: team-uhc-info
+managedResourceTypes:
+- Deployment
+- Service
+- ConfigMap
+- PodDisruptionBudget
+- PersistentVolumeClaim
+
+imagePatterns:
+- quay.io/app-sre/osd-fleet-manager
+- quay.io/app-sre/envoyproxy
+
+authentication:
+  image:
+    path: app-sre/quay/app-sre-pull
+    field: all
+validateTargetsInApp: true
+resourceTemplates:
+#
+# - integration, stage and production environments defined below
+# - each environment may have 1 or more sector deployments
+# - keep the common parameters on the environment level, only sector-specific parameters should be defined on the target level
+# - keep the parameters ordered alphabetically
+#
+- name: osd-fleet-manager-integration
+  url: https://gitlab.cee.redhat.com/service/osd-fleet-manager
+  path: /templates/named-service-template.yml
+  parameters:
+    ACCOUNT_POOL: fm-accountpool
+    AWS_BASE_DOMAIN: i3.devshift.org
+    CLUSTER_CHANNEL: stable
+    CLUSTER_EXPIRATION_TIME_DELTA_DAYS: 3650
+    MC_READY_WORKERS_REPEAT_INTERVAL: 360
+    SC_READY_WORKERS_REPEAT_INTERVAL: 180
+    TERRAFORM_RECONCILIATION_PERIOD: 1800
+    MEMORY_LIMIT: 2Gi
+    MEMORY_REQUEST: 1Gi
+    CPU_REQUEST: 200m
+    CPU_LIMIT: '1'
+    CPA_LADDER_CONFIG: '{ "coresToReplicas": [ [ 48, 3 ], [ 192, 6 ], [ 432, 0 ] ] }'
+    CLUSTER_TEMPLATES: |2-
+        # HyperShift Service Cluster
+        hs-sc:
+          name_prefix: "hs-sc-"
+          # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+          openshift_version: "openshift-v4.12.24"
+          multi_az: true
+          ccs: true
+          default_machine_pool:
+            machine_type: m5.xlarge
+            autoscale: false
+            nodes: 3
+          network_type: OVNKubernetes
+          private: false
+
+        # HyperShift Management Cluster
+        hs-mc:
+          name_prefix: "hs-mc-"
+          # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+          openshift_version: "openshift-v4.12.24"
+          multi_az: true
+          ccs: true
+          default_machine_pool:
+            machine_type: m5.4xlarge
+            autoscale: true
+            autoscale_min_replicas: 3
+            autoscale_max_replicas: 36
+          network_type: OVNKubernetes
+          private: false
+          additional_machine_pool_gangs:
+          - id_prefix: obo
+            machine_type: r5.4xlarge
+            autoscale: false
+            nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+            labels:
+              - key: node-role.kubernetes.io/obo
+                value: ""
+            taints:
+              - key: obo
+                value: true
+                effect: NoSchedule
+    DEVELOPER_USERS:
+    - fleet-manager-debug
+    DISABLE_ENABLED_REGION_CHECK: true
+    ENABLE_SIMPLE_IDENTITY_PROVIDER: true
+    ENVIRONMENT: integration
+    EXTERNAL_DNS_DOMAIN_FILTER: i3.devshift.org
+    HCP_TELEMETER_URL: https://infogw.api.integration.openshift.com/metrics/v1/receive
+    HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+          # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+          hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+          apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+          aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+          cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+          cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+          cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+          cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+          cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+    MANAGEMENT_CLUSTER_MAX_HOSTED_CLUSTER: '80'
+    MANAGEMENT_CLUSTER_HIGH_SATURATION_THRESHOLD: '80'
+    OCM_URL: ${OCM_BASE_URL}
+    READ_ONLY_USERS:
+    - fleet-manager-debug
+    REPLICAS: 1
+    RHOBS_URL: https://rhobs.rhobsp02ue1.api.openshift.com/api/metrics/v1/hypershift-platform-staging/api/v1/receive
+    RHOBS_ENV: int
+    SECTOR_ASSIGNMENT_POLICY: |-
+      rules:
+      # us-east-1 clusters go to the canary sector
+      - predicate:
+          region: us-east-1
+        sector: canary
+      # dynatrace testing will use us-east-2 for now
+      # See https://issues.redhat.com/browse/SDE-2837
+      - predicate:
+          region: us-east-2
+        sector: dynatrace
+      - predicate:
+          region: eu-west-3
+        sector: podisolation
+      - predicate:
+          region: eu-central-1
+        sector: upgradetesting
+      - predicate:
+          region: us-west-1
+        sector: qetesting
+      - predicate:
+          label:
+            key: label-qetesting-test
+            value: qetesting
+        sector: qetesting
+      # put everything else into the main sector
+      - sector: main
+    SUPPORTED_CLOUD_PROVIDERS: |-
+      - name: aws
+        regions:
+          - name: us-west-2
+          - name: us-east-2
+          - name: eu-central-1
+    TELEMETER_SERVER_URL: https://infogw.api.integration.openshift.com
+    TERRAFORM_ALLOWED_ACTIONS: none
+    TRANSIT_ACCOUNT_ARN: arn:aws:iam::232799112676:user/svc-cluster-aws-vpce-operator
+    TRANSIT_ACCOUNT_SECRET_NAME: svc-transit-int-aws-vpce-operator
+  targets:
+  - name: osd-fleet-manager-integration-canary
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/integration.yml
+    ref: main
+    upstream:
+      instance:
+        $ref: /dependencies/ci-int/ci-int.yml
+      name: service-osd-fleet-manager-gl-build-main
+    promotion:
+      publish:
+      - ocm-osdfm-deployed-int-canary
+    parameters:
+      DEPLOYMENT_NAME: canary
+      GATE_NAME: ocm-osdfm-int-canary
+      PROVISIONING_TIME_WINDOW: '259200'
+      TERRAFORM_ALLOWED_ACTIONS: none
+  - name: osd-fleet-manager-integration-qetesting
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/integration.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-int-canary
+    parameters:
+      DEPLOYMENT_NAME: qetesting
+      GATE_NAME: ocm-osdfm-int-canary
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.xlarge
+              autoscale: false
+              nodes: 3
+            network_type: OVNKubernetes
+            private: true
+
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 36
+            network_type: OVNKubernetes
+            private: true
+            additional_machine_pool_gangs:
+            - id_prefix: obo
+              machine_type: r5.4xlarge
+              autoscale: false
+              nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+              labels:
+                - key: node-role.kubernetes.io/obo
+                  value: ""
+              taints:
+                - key: obo
+                  value: true
+                  effect: NoSchedule
+  - name: osd-fleet-manager-integration-podisolation
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/integration.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-int-canary
+    parameters:
+      DEPLOYMENT_NAME: podisolation
+      GATE_NAME: ocm-osdfm-int-canary
+      ENABLE_POD_ISOLATION: true
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.xlarge
+              autoscale: false
+              nodes: 3
+            network_type: OVNKubernetes
+            private: false
+
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 36
+            network_type: OVNKubernetes
+            private: false
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # requires the one image and needs ocp 4.14 nightly hosted cluster
+            hypershift-operator: quay.io/acm-d/rhtap-hypershift-operator:a79960b
+  # Dynatrace-specific sector
+  # See https://issues.redhat.com/browse/SDE-2837
+  - name: osd-fleet-manager-integration-dynatrace
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/integration.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-int-canary
+    parameters:
+      DEPLOYMENT_NAME: dynatrace
+      GATE_NAME: ocm-osdfm-int-canary
+  - name: osd-fleet-manager-integration-main
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/integration.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-int-canary
+      publish:
+      - ocm-osdfm-deployed-int-main
+    parameters:
+      DEPLOYMENT_NAME: main
+      ENABLE_GLOBAL_WORKERS: true
+      GATE_NAME: ocm-osdfm-int-canary
+  - name: osd-fleet-manager-integration-upgradetesting
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/integration.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-int-canary
+      publish:
+      - osd-fleet-manager-integration-upgradetesting
+    parameters:
+      DEPLOYMENT_NAME: upgradetesting
+      GATE_NAME: ocm-osdfm-int-canary
+- name: osd-fleet-manager-stage
+  url: https://gitlab.cee.redhat.com/service/osd-fleet-manager
+  path: /templates/named-service-template.yml
+  parameters:
+    ACCOUNT_POOL: fm-accountpool
+    AWS_BASE_DOMAIN: s3.devshift.org
+    CLUSTER_CHANNEL: stable
+    CLUSTER_EXPIRATION_TIME_DELTA_DAYS: 3650
+    MEMORY_LIMIT: 2Gi
+    MEMORY_REQUEST: 1Gi
+    CPU_REQUEST: 200m
+    CPU_LIMIT: '1'
+    CPA_LADDER_CONFIG: '{ "coresToReplicas": [ [ 48, 3 ], [ 192, 6 ], [ 432, 0 ] ] }'
+    CLUSTER_TEMPLATES: |2-
+        # HyperShift Service Cluster
+        hs-sc:
+          name_prefix: "hs-sc-"
+          # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+          openshift_version: "openshift-v4.12.24"
+          multi_az: true
+          ccs: true
+          default_machine_pool:
+            machine_type: m5.4xlarge
+            autoscale: false
+            nodes: 3
+          compute_machine_type: m5.4xlarge
+          compute_autoscale: false
+          compute_nodes: 3
+          network_type: OVNKubernetes
+          private: false
+
+        # HyperShift Management Cluster
+        hs-mc:
+          name_prefix: "hs-mc-"
+          # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+          openshift_version: "openshift-v4.12.24"
+          multi_az: true
+          ccs: true
+          default_machine_pool:
+            machine_type: m5.4xlarge
+            autoscale: true
+            autoscale_min_replicas: 3
+            autoscale_max_replicas: 36
+          compute_machine_type: m5.4xlarge
+          compute_autoscale: true
+          compute_autoscale_min_replicas: 3
+          compute_autoscale_max_replicas: 36
+          network_type: OVNKubernetes
+          private: false
+          additional_machine_pool_gangs:
+          - id_prefix: obo
+            machine_type: r5.4xlarge
+            autoscale: false
+            nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+            labels:
+              - key: node-role.kubernetes.io/obo
+                value: ""
+            taints:
+              - key: obo
+                value: true
+                effect: NoSchedule
+    ENABLE_SIMPLE_IDENTITY_PROVIDER: true
+    ENVIRONMENT: stage
+    ENABLE_SENTRY: true
+    EXTERNAL_DNS_DOMAIN_FILTER: s3.devshift.org
+    HCP_TELEMETER_URL: https://infogw.api.stage.openshift.com/metrics/v1/receive
+    HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+          # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+          hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+          apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+          aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+          cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+          cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+          cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+          cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+          cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+    MANAGEMENT_CLUSTER_MAX_HOSTED_CLUSTER: '80'
+    MANAGEMENT_CLUSTER_HIGH_SATURATION_THRESHOLD: '80'
+    OCM_URL: ${OCM_BASE_URL}
+    READ_ONLY_USERS:
+    - fleet-manager-debug
+    REPLICAS: 1
+    RHOBS_ENV: staging
+    RHOBS_URL: https://rhobs.rhobsp02ue1.api.openshift.com/api/metrics/v1/hypershift-platform-staging/api/v1/receive
+    SECTOR_ASSIGNMENT_POLICY: |-
+      rules:
+      # the following service clusters go to the first perf sector
+      # "perf" sector is used for 80 HC tests
+      - predicate:
+          service_cluster_id: ce3phnmfvk4nujsvlceg
+        sector: perf
+      - predicate:
+          service_cluster_id: cfhcdasju93jsui4rs70
+        sector: perf
+      - predicate:
+          service_cluster_id: cfl443tbp9s50f9squrg
+        sector: perf2
+      - predicate:
+          service_cluster_id: cg3cbp6ijt9tsjs2f4i0
+        sector: perf2
+      - predicate:
+          service_cluster_id: cfr399q93bobfjjq35n0
+        sector: perf3
+      - predicate:
+          service_cluster_id: cg7j4d602khm1qggri70
+        sector: perf3
+      - predicate:
+          region: us-east-2
+        sector: perf2
+      - predicate:
+          region: us-east-1
+        sector: chaos
+      - predicate:
+          region: eu-west-1
+        sector: perf3
+      - predicate:
+          label:
+            key: "sector-override"
+            value: "ibm-infra"
+        sector: ibm-infra
+      - predicate:
+          label:
+            key: sector-override
+            value: migrationtesting
+        sector: migrationtesting
+      - predicate:
+          region: ap-northeast-2
+        sector: podisolation
+      # put everything else into the main sector
+      - sector: main
+    SENTRY_PROJECT: 11
+    SENTRY_URL: glitchtip.devshift.net
+    SUPPORTED_CLOUD_PROVIDERS: |-
+      - name: aws
+        regions:
+          - name: us-west-2
+          - name: us-east-2 # reserved for perf testing
+          - name: us-east-1 # reserved for chaos testing
+          - name: eu-west-1 # reserved for perf testing (perf3 sector)
+          - name: ap-northeast-1
+    TELEMETER_SERVER_URL: https://infogw.api.stage.openshift.com
+    TERRAFORM_ALLOWED_ACTIONS: none
+    TRANSIT_ACCOUNT_ARN: arn:aws:iam::254070712068:user/svc-cluster-aws-vpce-operator
+    TRANSIT_ACCOUNT_SECRET_NAME: svc-transit-stage-aws-vpce-operator
+  targets:
+  - name: osd-fleet-manager-stage-canary
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-int-main
+      publish:
+      - ocm-osdfm-deployed-stage-canary
+    parameters:
+      DEPLOYMENT_NAME: canary
+      GATE_NAME: ocm-osdfm-stage-canary
+  - name: osd-fleet-manager-stage-perf
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      publish:
+      - ocm-osdfm-deployed-stage-perf
+      subscribe:
+      - ocm-osdfm-deployed-stage-canary
+    parameters:
+      GATE_NAME: ocm-osdfm-stage-canary
+      CPA_LADDER_CONFIG: '{ "coresToReplicas": [ [ 48, 3 ], [ 192, 6 ], [ 432, 0 ] ] }'
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: false
+              nodes: 3
+            compute_machine_type: m5.4xlarge
+            compute_autoscale: false
+            compute_nodes: 3
+            network_type: OVNKubernetes
+            private: false
+
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 36
+            compute_machine_type: m5.4xlarge
+            compute_autoscale: true
+            compute_autoscale_min_replicas: 3
+            compute_autoscale_max_replicas: 36
+            network_type: OVNKubernetes
+            private: false
+            additional_machine_pool_gangs:
+            - id_prefix: obo
+              machine_type: r5.4xlarge
+              autoscale: false
+              nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+              labels:
+                - key: node-role.kubernetes.io/obo
+                  value: ""
+              taints:
+                - key: obo
+                  value: true
+                  effect: NoSchedule
+      DEPLOYMENT_NAME: perf
+      DATAPLANE_CLUSTER_SCALING_TYPE: manual
+  - name: osd-fleet-manager-stage-perf2
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      publish:
+      - ocm-osdfm-deployed-stage-perf2
+      subscribe:
+      - ocm-osdfm-deployed-stage-canary
+    parameters:
+      GATE_NAME: ocm-osdfm-stage-canary
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m6a.4xlarge
+              autoscale: false
+              nodes: 3
+            compute_machine_type: m6a.4xlarge
+            master_machine_type: m6a.2xlarge
+            infra_machine_type: r6a.xlarge
+            compute_autoscale: false
+            compute_nodes: 3
+            network_type: OVNKubernetes
+            private: false
+
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m6a.4xlarge
+              autoscale: false
+              nodes: 3
+            compute_machine_type: m6a.4xlarge
+            master_machine_type: m6a.2xlarge
+            infra_machine_type: r6a.xlarge
+            compute_autoscale: false
+            compute_nodes: 3
+            network_type: OVNKubernetes
+            private: false
+            additional_machine_pool_gangs:
+            - id_prefix: obo
+              machine_type: r6a.4xlarge
+              autoscale: false
+              nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+              labels:
+                - key: node-role.kubernetes.io/obo
+                  value: ""
+              taints:
+                - key: obo
+                  value: true
+                  effect: NoSchedule
+      DEPLOYMENT_NAME: perf2
+      DATAPLANE_CLUSTER_SCALING_TYPE: manual
+  - name: osd-fleet-manager-stage-perf3
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      publish:
+      - ocm-osdfm-deployed-stage-perf3
+      subscribe:
+      - ocm-osdfm-deployed-stage-canary
+    parameters:
+      GATE_NAME: ocm-osdfm-stage-canary
+      CPA_LADDER_CONFIG: '{ "coresToReplicas": [ [ 48, 3 ], [ 192, 6 ], [ 432, 0 ] ] }'
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: false
+              nodes: 3
+            compute_machine_type: m5.4xlarge
+            compute_autoscale: false
+            compute_nodes: 3
+            network_type: OVNKubernetes
+            private: false
+
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.8xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 36
+            compute_machine_type: m5.8xlarge
+            compute_autoscale: true
+            compute_autoscale_min_replicas: 3
+            compute_autoscale_max_replicas: 36
+            network_type: OVNKubernetes
+            private: false
+            additional_machine_pool_gangs:
+            - id_prefix: obo
+              machine_type: r5.4xlarge
+              autoscale: false
+              nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+              labels:
+                - key: node-role.kubernetes.io/obo
+                  value: ""
+              taints:
+                - key: obo
+                  value: true
+                  effect: NoSchedule
+      DEPLOYMENT_NAME: perf3
+      DATAPLANE_CLUSTER_SCALING_TYPE: manual
+  - name: osd-fleet-manager-stage-podisolation
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      publish:
+      - ocm-osdfm-deployed-stage-podisolation
+      subscribe:
+      - ocm-osdfm-deployed-stage-canary
+    parameters:
+      DEPLOYMENT_NAME: podisolation
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: false
+              nodes: 3
+            compute_machine_type: m5.4xlarge
+            compute_autoscale: false
+            compute_nodes: 3
+            network_type: OVNKubernetes
+            private: true
+
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 36
+            compute_machine_type: m5.4xlarge
+            compute_autoscale: true
+            compute_autoscale_min_replicas: 3
+            compute_autoscale_max_replicas: 36
+            network_type: OVNKubernetes
+            private: true
+            additional_machine_pool_gangs:
+            - id_prefix: obo
+              machine_type: r5.4xlarge
+              autoscale: false
+              nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+              labels:
+                - key: node-role.kubernetes.io/obo
+                  value: ""
+              taints:
+                - key: obo
+                  value: true
+                  effect: NoSchedule
+      GATE_NAME: ocm-osdfm-stage-canary
+      ENABLE_POD_ISOLATION: true
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            hypershift-operator: quay.io/acm-d/rhtap-hypershift-operator:a79960b
+  - name: osd-fleet-manager-stage-chaos
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      publish:
+      - ocm-osdfm-deployed-stage-chaos
+      subscribe:
+      - ocm-osdfm-deployed-stage-canary
+    parameters:
+      GATE_NAME: ocm-osdfm-stage-canary
+      CPA_LADDER_CONFIG: '{ "coresToReplicas": [ [ 48, 3 ], [ 192, 6 ], [ 432, 0 ] ] }'
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: false
+              nodes: 3
+            compute_machine_type: m5.4xlarge
+            compute_autoscale: false
+            compute_nodes: 3
+            network_type: OVNKubernetes
+            private: false
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 36
+            compute_machine_type: m5.4xlarge
+            compute_autoscale: true
+            compute_autoscale_min_replicas: 3
+            compute_autoscale_max_replicas: 36
+            network_type: OVNKubernetes
+            private: false
+            additional_machine_pool_gangs:
+            - id_prefix: obo
+              machine_type: r5.4xlarge
+              autoscale: false
+              nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+              labels:
+                - key: node-role.kubernetes.io/obo
+                  value: ""
+              taints:
+                - key: obo
+                  value: true
+                  effect: NoSchedule
+      DEPLOYMENT_NAME: chaos
+      DATAPLANE_CLUSTER_SCALING_TYPE: manual
+  # Sector specifically for HCP migration testing/validation
+  # See #wg-hcp-migration and https://issues.redhat.com/browse/SDE-2923
+  - name: osd-fleet-manager-stage-migrationtesting
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      publish:
+      - ocm-osdfm-deployed-stage-migrationtesting
+      subscribe:
+      - ocm-osdfm-deployed-stage-canary
+    parameters:
+      DEPLOYMENT_NAME: migrationtesting
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 9
+              nodes: 3
+            network_type: OVNKubernetes
+            private: true
+
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 60
+            network_type: OVNKubernetes
+            private: true
+            additional_machine_pool_gangs:
+            - id_prefix: obo
+              machine_type: r5.4xlarge
+              autoscale: false
+              nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+              labels:
+                - key: node-role.kubernetes.io/obo
+                  value: ""
+              taints:
+                - key: obo
+                  value: true
+                  effect: NoSchedule
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+            hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+            apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+            aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+            cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+            cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+            cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+            cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+            cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+      GATE_NAME: ocm-osdfm-stage-canary
+      
+  - name: osd-fleet-manager-stage-ibm-infra
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-stage-canary
+      publish:
+      - ocm-osdfm-deployed-stage-ibm-infra
+    parameters:
+      GATE_NAME: ocm-osdfm-stage-ibm-infra
+      CPA_LADDER_CONFIG: '{ "coresToReplicas": [ [ 48, 3 ], [ 192, 6 ], [ 432, 0 ] ] }'
+      DEPLOYMENT_NAME: ibm-infra
+      ENABLE_GLOBAL_WORKERS: true
+      ENBALE_POD_ISOLATION: false
+      ENABLE_SIMPLE_IDENTITY_PROVIDER: false
+
+  - name: osd-fleet-manager-stage-main
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/stage.yml
+    ref: 21ab4630fc90bfe408d259266912bf658fb50a89
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-stage-canary
+      publish:
+      - ocm-osdfm-deployed-stage-main
+    parameters:
+      GATE_NAME: ocm-osdfm-stage-main
+      CPA_LADDER_CONFIG: '{ "coresToReplicas": [ [ 48, 3 ], [ 192, 6 ], [ 432, 0 ] ] }'
+      DEPLOYMENT_NAME: main
+      ENABLE_GLOBAL_WORKERS: true
+      # TODO enablement of the simple IDP (htpasswd) should be temporary
+      #      see https://redhat-internal.slack.com/archives/C03TU14HLB0/p1681249831192119
+      ENABLE_SIMPLE_IDENTITY_PROVIDER: true
+# PRODUCTION
+- name: osd-fleet-manager-production
+  url: https://gitlab.cee.redhat.com/service/osd-fleet-manager
+  path: /templates/named-service-template.yml
+  parameters:
+    GATE_NAME: ocm-osdfm-prod-main
+    ACCOUNT_POOL: fm-accountpool
+    AWS_BASE_DOMAIN: p3.openshiftapps.com
+    CLUSTER_CHANNEL: stable
+    MEMORY_LIMIT: 2Gi
+    MEMORY_REQUEST: 1Gi
+    CPU_REQUEST: 200m
+    CPU_LIMIT: '1'
+    CPA_LADDER_CONFIG: '{ "coresToReplicas": [ [ 48, 3 ], [ 192, 6 ], [ 432, 0 ] ] }'
+    CLUSTER_TEMPLATES: |2-
+        # HyperShift Service Cluster
+        hs-sc:
+          name_prefix: "hs-sc-"
+          # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+          openshift_version: "openshift-v4.12.24"
+          multi_az: true
+          ccs: true
+          default_machine_pool:
+            machine_type: m5.4xlarge
+            autoscale: true
+            autoscale_min_replicas: 3
+            autoscale_max_replicas: 9
+            nodes: 3
+          network_type: OVNKubernetes
+          private: true
+
+        # HyperShift Management Cluster
+        hs-mc:
+          name_prefix: "hs-mc-"
+          # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+          openshift_version: "openshift-v4.12.24"
+          multi_az: true
+          ccs: true
+          default_machine_pool:
+            machine_type: m5.4xlarge
+            autoscale: true
+            autoscale_min_replicas: 3
+            autoscale_max_replicas: 60
+          network_type: OVNKubernetes
+          private: true
+          additional_machine_pool_gangs:
+          - id_prefix: obo
+            machine_type: r5.4xlarge
+            autoscale: false
+            nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+            labels:
+              - key: node-role.kubernetes.io/obo
+                value: ""
+            taints:
+              - key: obo
+                value: true
+                effect: NoSchedule
+    ENABLE_SIMPLE_IDENTITY_PROVIDER: false
+    ENABLE_SENTRY: true
+    ENVIRONMENT: production
+    EXTERNAL_DNS_DOMAIN_FILTER: p3.openshiftapps.com
+    HCP_TELEMETER_URL: https://infogw.api.openshift.com/metrics/v1/receive
+    MANAGEMENT_CLUSTER_MAX_HOSTED_CLUSTER: '80'
+    MANAGEMENT_CLUSTER_HIGH_SATURATION_THRESHOLD: '80'
+    OCM_URL: ${OCM_BASE_URL}
+    REPLICAS: 3
+    RHOBS_URL: https://rhobs.rhobsp02ue1.api.openshift.com/api/metrics/v1/hypershift-platform/api/v1/receive
+    RHOBS_ENV: prod
+    SECTOR_ASSIGNMENT_POLICY: |-
+      rules:
+      # TODO this means all us-east-1 service clusters created land in canary
+      #      we need to properly define some logic to allow for multiple sectors in this region
+      #      see https://issues.redhat.com/browse/SDA-8710
+      - predicate:
+          service_cluster_id: cglj2d9q8pphistom8bg
+        sector: canary
+      - predicate:
+          label:
+            key: "sector-override"
+            value: "ibm-infra"
+        sector: ibm-infra
+      - predicate:
+          region: ap-southeast-3
+        sector: ap-southeast-3
+      - predicate:
+          region: us-east-1
+        sector: us-east-1
+      - predicate:
+          region: us-east-2
+        sector: us-east-2
+      - predicate:
+          region: us-west-2
+        sector: us-west-2
+      - predicate:
+          region: eu-central-1
+        sector: eu-central-1
+      - predicate:
+          region: eu-west-1
+        sector: eu-west-1
+      # put everything else into the canary sector for now
+      - sector: canary
+    SENTRY_PROJECT: 59
+    SENTRY_URL: glitchtip.devshift.net
+    SUPPORTED_CLOUD_PROVIDERS: |-
+      - name: aws
+        regions:
+          - name: us-east-1
+          - name: us-east-2
+          - name: eu-west-1
+          - name: us-west-2
+          - name: eu-central-1
+          - name: ap-southeast-3
+          - name: ap-northeast-1
+          - name: ap-northeast-2
+    TRANSIT_ACCOUNT_ARN: arn:aws:iam::306576167143:user/svc-cluster-prod-aws-vpce-operator
+    TRANSIT_ACCOUNT_SECRET_NAME: svc-transit-prod-aws-vpce-operator
+    TERRAFORM_ALLOWED_ACTIONS: none
+    TELEMETER_SERVER_URL: https://infogw.api.openshift.com
+  targets:
+  - name: osd-fleet-manager-production-us-east-2
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/production.yml
+    ref: 462787aba3d32cb1791b9dca24d91589ab0e4b0a
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-production-us-west-2
+      publish:
+      - ocm-osdfm-deployed-production-us-east-2
+    parameters:
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+            hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+            apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+            aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+            cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+            cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+            cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+            cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+            cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+      DEPLOYMENT_NAME: us-east-2
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 9
+              nodes: 3
+            network_type: OVNKubernetes
+            private: true
+
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 60
+            network_type: OVNKubernetes
+            private: true
+            additional_machine_pool_gangs:
+            - id_prefix: obo
+              machine_type: r5.4xlarge
+              autoscale: false
+              nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+              labels:
+                - key: node-role.kubernetes.io/obo
+                  value: ""
+              taints:
+                - key: obo
+                  value: true
+                  effect: NoSchedule
+  - name: osd-fleet-manager-production-us-east-1
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/production.yml
+    ref: 462787aba3d32cb1791b9dca24d91589ab0e4b0a
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-production-us-east-2
+      publish:
+      - ocm-osdfm-deployed-production-us-east-1
+    parameters:
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+            hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+            apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+            aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+            cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+            cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+            cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+            cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+            cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+      DEPLOYMENT_NAME: us-east-1
+  - name: osd-fleet-manager-production-us-west-2
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/production.yml
+    ref: 462787aba3d32cb1791b9dca24d91589ab0e4b0a
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-production-eu-west-1
+      publish:
+      - ocm-osdfm-deployed-production-us-west-2
+    parameters:
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+            hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+            apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+            aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+            cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+            cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+            cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+            cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+            cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+      DEPLOYMENT_NAME: us-west-2
+  - name: osd-fleet-manager-production-eu-west-1
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/production.yml
+    ref: 462787aba3d32cb1791b9dca24d91589ab0e4b0a
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-production-eu-central-1
+      publish:
+      - ocm-osdfm-deployed-production-eu-west-1
+    parameters:
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+            hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+            apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+            aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+            cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+            cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+            cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+            cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+            cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+      DEPLOYMENT_NAME: eu-west-1
+      ENABLE_GLOBAL_WORKERS: true
+  - name: osd-fleet-manager-production-ap-southeast-3
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/production.yml
+    ref: 462787aba3d32cb1791b9dca24d91589ab0e4b0a
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-production-canary
+      publish:
+      - ocm-osdfm-deployed-production-ap-southeast-3
+    parameters:
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+            hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+            apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+            aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+            cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+            cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+            cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+            cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+            cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+      DEPLOYMENT_NAME: ap-southeast-3
+  - name: osd-fleet-manager-production-eu-central-1
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/production.yml
+    ref: 462787aba3d32cb1791b9dca24d91589ab0e4b0a
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-production-ap-southeast-3
+      publish:
+      - ocm-osdfm-deployed-production-eu-central-1
+    parameters:
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+            hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+            apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+            aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+            cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+            cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+            cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+            cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+            cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+      DEPLOYMENT_NAME: eu-central-1
+  - name: osd-fleet-manager-production-ibm-infra
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/production.yml
+    ref: 462787aba3d32cb1791b9dca24d91589ab0e4b0a
+    promotion:
+      auto: true
+      subscribe:
+      - ocm-osdfm-deployed-production-us-east-1
+      publish:
+      - ocm-osdfm-deployed-production-ibm-infra
+    parameters:
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+            hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+            apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+            aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+            cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+            cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+            cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+            cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+            cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9
+      DEPLOYMENT_NAME: ibm-infra
+      ENABLE_POD_ISOLATION: false
+  - name: osd-fleet-manager-production-canary
+    namespace:
+      $ref: /services/ocm/osd-fleet-manager/namespaces/production.yml
+    ref: 462787aba3d32cb1791b9dca24d91589ab0e4b0a
+    promotion:
+      publish:
+      - ocm-osdfm-deployed-production-canary
+    parameters:
+      DEPLOYMENT_NAME: canary
+      CLUSTER_CHANNEL: stable
+      CPA_LADDER_CONFIG: '{ "coresToReplicas": [ [ 48, 3 ], [ 192, 6 ], [ 432, 0 ] ] }'
+      CLUSTER_TEMPLATES: |2-
+          # HyperShift Service Cluster
+          hs-sc:
+            name_prefix: "hs-sc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 9
+            network_type: OVNKubernetes
+            private: true
+
+          # HyperShift Management Cluster
+          hs-mc:
+            name_prefix: "hs-mc-"
+            # See /api/clusters_mgmt/v1/versions for list of supported version IDs
+            openshift_version: "openshift-v4.12.24"
+            multi_az: true
+            ccs: true
+            default_machine_pool:
+              machine_type: m5.4xlarge
+              autoscale: true
+              autoscale_min_replicas: 3
+              autoscale_max_replicas: 60
+            network_type: OVNKubernetes
+            private: true
+            additional_machine_pool_gangs:
+            - id_prefix: obo
+              machine_type: r5.4xlarge
+              autoscale: false
+              nodes: 3 # AFAIK this means 1 in each of the 3 available AZs
+              labels:
+                - key: node-role.kubernetes.io/obo
+                  value: ""
+              taints:
+                - key: obo
+                  value: true
+                  effect: NoSchedule
+      HYPERSHIFT_OPERATOR_OVERRIDING_DATA: |2-
+            # openshift/hypershift.git branch release-4.13 commit 51dcea7b42a315af3079b63b527040f27b052c98 / tag v0.1.9
+            hypershift-operator: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-hypershift-rhel8-operator@sha256:568384651e28dd40a5f0cc6ac15e7cfd8cc8f58d31f99843f7448683b543f1d5
+            apiserver-network-proxy: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-apiserver-network-proxy-rhel8@sha256:281c31c439d4116a7180519370955254d1845e57fb0c2b9b55a84e4798bec9ce
+            aws-encryption-provider: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-aws-encryption-provider-rhel8@sha256:5c1afc24ccc9ef5c41f78a6561fc43c6f653bc772c752a656f01d8596ffccaa8
+            cluster-api: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-rhel8@sha256:c6edc4a5f6cc09f6ac733350615d8c134993af83e8d07025e3aa4dec596a2488
+            cluster-api-provider-agent: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-agent-rhel8@sha256:7dd4c639450284a8a4893fad89b49183a244deeaf05bc25370446316593a51e3
+            cluster-api-provider-aws: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-aws-rhel8@sha256:1915ed9c08b461fcaefbf9f7933c5c0b805e175698abde1335d3814ebb5e8148
+            cluster-api-provider-azure: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-azure-rhel8@sha256:404bde6e2915b24cf46352d9352128392c50c4efd790845be413982ef5154b43
+            cluster-api-provider-kubevirt: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-cluster-api-provider-kubevirt-rhel8@sha256:8d7f489b7040e2c528e51e46b290074fc161a42cdf3120c2cc0544b3ca97dde9

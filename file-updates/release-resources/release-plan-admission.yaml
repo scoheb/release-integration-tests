@@ -1,0 +1,21 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleasePlanAdmission
+metadata:
+  labels:
+    release.appstudio.openshift.io/auto-release: "true"
+  name: file-updates-test-rpa
+  namespace: managed-release-team-tenant
+spec:
+  application: fileupdatestest
+  extraData:
+    fileUpdates:
+      - paths:
+        - path: data/services/ocm/osd-fleet-manager/cicd/deploy.yaml
+          replacements:
+          - key: "(.resourceTemplates[] | select(.name==\"osd-fleet-manager-integration\") | .parameters.HYPERSHIFT_OPERATOR_OVERRIDING_DATA)"
+            replacement: "|hypershift-operator:.*|hypershift-operator: SCOTT|"
+        ref: master
+        upstream_repo: https://gitlab.cee.redhat.com/shebert/app-interface.git
+        repo: https://gitlab.cee.redhat.com/hacbs-release-tests/app-interface.git
+  origin: dev-release-team-tenant
+  releaseStrategy: file-updates-test-rs

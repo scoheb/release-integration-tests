@@ -1,0 +1,11 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleasePlan
+metadata:
+  labels:
+    release.appstudio.openshift.io/auto-release: 'true'
+    release.appstudio.openshift.io/standing-attribution: 'true'
+  name: file-updates-test-rp
+spec:
+  application: fileupdatestest
+  displayName: file-updates-test-rp
+  target: managed-release-team-tenant

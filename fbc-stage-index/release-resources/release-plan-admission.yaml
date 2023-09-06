@@ -1,0 +1,9 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleasePlanAdmission
+metadata:
+  name: e2e-fbc-stage-index-releaseplanadmission
+  namespace: managed-release-team-tenant
+spec:
+  application: e2e-fbc-stage-index-application
+  origin: dev-release-team-tenant
+  releaseStrategy: e2e-fbc-stage-index-strategy
