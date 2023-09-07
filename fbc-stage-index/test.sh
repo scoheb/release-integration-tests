@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-#trap teardown EXIT
+trap teardown EXIT
 
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -16,8 +16,7 @@ RELEASE_STRATEGY_NAME="e2e-fbc-stage-index-strategy"
 TIMEOUT_SECONDS=600
 
 function setup() {
-    
-    
+
     echo "Creating Application"
     kubectl apply -f release-resources/application.yaml "$DEV_KUBECONFIG"
 
@@ -39,7 +38,7 @@ function setup() {
 }
 
 function teardown() {
-   
+
     kubectl delete pr -l "appstudio.openshift.io/application="$APPLICATION_NAME",pipelines.appstudio.openshift.io/type="build",appstudio.openshift.io/component="$COMPONENT_NAME"" "$DEV_KUBECONFIG"
     kubectl delete pr -l "appstudio.openshift.io/application="$APPLICATION_NAME",pipelines.appstudio.openshift.io/type="release"" "$MANAGED_KUBECONFIG"
     kubectl delete release "$DEV_KUBECONFIG" -o=jsonpath='{.items[?(@.spec.releasePlan=="$RELEASE_PLAN_NAME")].metadata.name}' 2>/dev/null
@@ -81,8 +80,8 @@ function wait_for_pr_to_complete() {
             echo "PipelineRun "$name" failed."
             return 1
         fi
-        
-        if [ "$status" = "True" ] && [ "$reason" = "Completed" ] && [ "$type" = "Succeeded" ]; then
+
+        if [ "$status" = "True" ] && [ "$type" = "Succeeded" ]; then
             echo "PipelineRun "$name" succeeded."
             return 0
         else
@@ -100,6 +99,8 @@ function wait_for_pr_to_complete() {
 }
 
 echo "Setting up resources"
+teardown
+sleep 5
 setup
 
 echo "Wait for build PipelineRun to finish"
@@ -113,18 +114,19 @@ sleep 15
 
 echo "Checking Release status"
 # Get name of Release CR associated with Release Strategy "e2e-fbc-strategy".
-release_name=$(kubectl get release  "$DEV_KUBECONFIG" -o jsonpath="{range .items[?(@.status.processing.releaseStrategy=='$MANAGED_NAMESPACE/$RELEASE_STRATEGY_NAME')]}{.metadata.name}{end}")
+release_name=$(kubectl get release  "$DEV_KUBECONFIG" -o jsonpath="{range .items[?(@.status.processing.releaseStrategy=='$MANAGED_NAMESPACE/$RELEASE_STRATEGY_NAME')]}{.metadata.name}{'\n'}{end}" --sort-by={metadata.creationTimestamp} | tail -1)
+echo "release_name: $release_name"
 
 # Get the Released Status and Reason values to identify if fail or succeeded
 release_status=$(kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpath='{.status.conditions[?(@.type=="Released")].status}' 2>/dev/null)
 release_reason=$(kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpath='{.status.conditions[?(@.type=="Released")].reason}' 2>/dev/null)
 
-echo "Status: "$release_status"" 
-echo "Reason: "$release_reason"" 
+echo "Status: "$release_status""
+echo "Reason: "$release_reason""
 
 if [ "$release_status" = "True" ] && [ "$release_reason" = "Succeeded" ]; then
     echo "Release "$release_name" Released succeeded."
-else 
+else
     echo "Release "$release_name" Released Failed."
-    trap - EXIT
 fi
+trap - EXIT

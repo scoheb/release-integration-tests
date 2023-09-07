@@ -16,8 +16,7 @@ RELEASE_STRATEGY_NAME="file-updates-test-rs"
 TIMEOUT_SECONDS=600
 
 function setup() {
-    
-    
+
     echo "Creating Application"
     kubectl apply -f release-resources/application.yaml "$DEV_KUBECONFIG"
 
@@ -35,6 +34,7 @@ function setup() {
 
     echo "Creating EnterpriseContractPolicy"
     kubectl apply -f release-resources/ec-policy.yaml "$MANAGED_KUBECONFIG"
+
 }
 
 function teardown() {
@@ -53,11 +53,10 @@ function teardown() {
     fi
 }
 
-# Function to check the status of argument $1 CRD contains labels $2 CRD labels
+# Function to watch Build or Release PipelineRun and wait till succeeds.
 function wait_for_pr_to_complete() {
     local kube_config
     local type=$1
-    local success_reason=$2
     local start_time=$(date +%s)
 
     if [ "$type" = "release" ]; then
@@ -68,9 +67,9 @@ function wait_for_pr_to_complete() {
         crd_labels="appstudio.openshift.io/application="$APPLICATION_NAME",pipelines.appstudio.openshift.io/type="$type",appstudio.openshift.io/component="$COMPONENT_NAME""
     fi
 
-    while true; do        
+    while true; do
         crd_json=$(kubectl get PipelineRun -l "$crd_labels" "$kube_config" -o=json)
-        
+
         reason=$(echo "$crd_json" | jq -r '.items[0].status.conditions[0].reason')
         status=$(echo "$crd_json" | jq -r '.items[0].status.conditions[0].status')
         type=$(echo "$crd_json" | jq -r '.items[0].status.conditions[0].type')
@@ -113,11 +112,12 @@ sleep 10
 
 echo "Checking Release status"
 # Get name of Release CR associated with Release Strategy "e2e-fbc-strategy".
-release_name=$(kubectl get release  "$DEV_KUBECONFIG" -o jsonpath="{range .items[?(@.status.processing.releaseStrategy=='$MANAGED_NAMESPACE/$RELEASE_STRATEGY_NAME')]}{.metadata.name}{end}")
+release_name=$(kubectl get release  "$DEV_KUBECONFIG" -o jsonpath="{range .items[?(@.status.processing.releaseStrategy=='$MANAGED_NAMESPACE/$RELEASE_STRATEGY_NAME')]}{.metadata.name}{'\n'}{end}" --sort-by={metadata.creationTimestamp} | tail -1)
+echo "release_name: $release_name"
 
 # Get the Released Status and Reason values to identify if fail or succeeded
-release_status=$(kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpath='{.status.conditions[?(@.type=="Released")].status}')
-release_reason=$(kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpath='{.status.conditions[?(@.type=="Released")].reason}')
+release_status=$(kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpath='{.status.conditions[?(@.type=="Released")].status}' 2>/dev/null)
+release_reason=$(kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpath='{.status.conditions[?(@.type=="Released")].reason}' 2>/dev/null)
 
 echo "Status: "$release_status""
 echo "Reason: "$release_reason""
@@ -127,6 +127,3 @@ if [ "$release_status" = "True" ] && [ "$release_reason" = "Succeeded" ]; then
 else
     echo "Release "$release_name" Released Failed."
 fi
-
-kubectl get release "$release_name" "$DEV_KUBECONFIG" -o jsonpath='{.status}' | jq .
-#trap - EXIT

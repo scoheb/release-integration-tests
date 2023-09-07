@@ -13,7 +13,7 @@ spec:
         - path: data/services/ocm/osd-fleet-manager/cicd/deploy.yaml
           replacements:
           - key: "(.resourceTemplates[] | select(.name==\"osd-fleet-manager-integration\") | .parameters.HYPERSHIFT_OPERATOR_OVERRIDING_DATA)"
-            replacement: "|hypershift-operator:.*|hypershift-operator: SCOTT|"
+            replacement: "|hypershift-operator:.*|hypershift-operator: {{ .components[] | select(.name==\"fileupdatestest-component\") .containerImage }}|"
         ref: master
         upstream_repo: https://gitlab.cee.redhat.com/shebert/app-interface.git
         repo: https://gitlab.cee.redhat.com/hacbs-release-tests/app-interface.git

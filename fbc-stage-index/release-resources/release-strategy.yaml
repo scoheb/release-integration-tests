@@ -9,15 +9,13 @@ spec:
     - name: fromIndex
       value: 'registry-proxy.engineering.redhat.com/rh-osbs/iib-pub-pending:v4.13'
     - name: targetIndex
-      value: 'quay.io/scoheb/fbc-target-index-testing:latest'
+      value: ''
     - name: binaryImage
       value: 'registry.redhat.io/openshift4/ose-operator-registry:v4.12'
     - name: requestUpdateTimeout
       value: '1000'
     - name: buildTimeoutSeconds
       value: '1000'
-#    - name: iibOverwriteFromIndexCredential
-#      value: "iib-overwrite-fromimage-credentials-pub-pending"
   pipeline: fbc-release
   policy: e2e-fbc-stage-index-policy
   serviceAccount: release-service-account
