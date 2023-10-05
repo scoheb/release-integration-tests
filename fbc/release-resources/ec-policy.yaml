@@ -4,22 +4,19 @@ metadata:
   name: fbc-policy
   namespace: managed-release-team-tenant
 spec:
-  description: >-
-    Includes rules for levels 1, 2 & 3 of SLSA v0.1.
-  publicKey: "k8s://openshift-pipelines/public-key"
+  configuration:
+    exclude:
+      - cve # The release process separates the catalog from the binaries, so CVEs are the responsibility of the OLM team
+      - step_image_registries
+      - tasks.required_tasks_found:prefetch-dependencies # prefetch is not required
+    include:
+      - '@redhat'
+  description: 'Includes rules for shipping Red Hat FBC fragments'
+  publicKey: 'k8s://openshift-pipelines/public-key'
   sources:
-    - name: Default
+    - data:
+        - github.com/enterprise-contract/ec-policies//data
+      name: Default
       policy:
         - github.com/enterprise-contract/ec-policies//policy/lib
         - github.com/enterprise-contract/ec-policies//policy/release
-      data:
-        - github.com/enterprise-contract/ec-policies//data
-  configuration:
-    include:
-      - '@slsa1'
-      - '@slsa2'
-      - '@slsa3'
-    exclude:
-      # Exclude step_image_registries for now since it can cause false
-      # positives due to https://issues.redhat.com/browse/OCPBUGS-8428
-      - step_image_registries
