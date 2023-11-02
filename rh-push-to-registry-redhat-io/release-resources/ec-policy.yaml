@@ -8,12 +8,13 @@ spec:
     Includes rules for levels 1, 2 & 3 of SLSA v0.1.
   publicKey: "k8s://openshift-pipelines/public-key"
   sources:
-    - name: Default
+    - data:
+        - github.com/release-engineering/rhtap-ec-policy//data
+        - oci::quay.io/redhat-appstudio-tekton-catalog/data-acceptable-bundles:latest
+      name: Default
       policy:
         - github.com/enterprise-contract/ec-policies//policy/lib
         - github.com/enterprise-contract/ec-policies//policy/release
-      data:
-        - github.com/release-engineering/rhtap-ec-policy//data
   configuration:
     include:
       - '@slsa1'

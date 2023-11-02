@@ -6,6 +6,7 @@ APPLICATION_NAME="rh-push-to-registry-redhat-iotest"
 COMPONENT_NAME="rh-push-to-registry-redhat-iotest-component"
 RELEASE_PLAN_NAME="rh-push-to-registry-redhat-io-test-rp"
 RELEASE_PLAN_ADMISSION_NAME="rh-push-to-registry-redhat-io-test-rpa"
+BUILD_PIPELINE_SELECTOR_NAME="rh-push-to-registry-redhat-io-build-pipeline-selector"
 TIMEOUT_SECONDS=600
 
 DEV_WORKSPACE="dev-release-team"
@@ -39,6 +40,9 @@ print_help(){
 
 function setup() {
 
+    echo "Creating BuildPipelineSelector"
+    kubectl apply -f release-resources/buildpipelineselector.yaml "${DEV_KUBECONFIG_ARG}"
+
     echo "Creating Application"
     kubectl apply -f release-resources/application.yaml "${DEV_KUBECONFIG_ARG}"
 
@@ -62,6 +66,7 @@ function teardown() {
     kubectl delete pr -l "appstudio.openshift.io/application=$APPLICATION_NAME,pipelines.appstudio.openshift.io/type=release" "${MANAGED_KUBECONFIG_ARG}"
     kubectl delete release "${DEV_KUBECONFIG_ARG}" -o=jsonpath="{.items[?(@.spec.releasePlan==\"$RELEASE_PLAN_NAME\")].metadata.name}"
     kubectl delete releaseplanadmission "$RELEASE_PLAN_ADMISSION_NAME" "${MANAGED_KUBECONFIG_ARG}"
+    kubectl delete buildpipelineselector "${BUILD_PIPELINE_SELECTOR_NAME}" "${DEV_KUBECONFIG_ARG}"
 
     if kubectl get application "$APPLICATION_NAME"  "${DEV_KUBECONFIG_ARG}" &> /dev/null; then
         echo "Application $APPLICATION_NAME exists. Deleting..."

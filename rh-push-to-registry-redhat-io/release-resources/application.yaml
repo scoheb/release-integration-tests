@@ -3,5 +3,5 @@ kind: Application
 metadata:
   name: rh-push-to-registry-redhat-iotest
 spec:
-  description: AppStudio
-  displayName: AppStudio
+  description: rh-push-to-registry-redhat-iotest
+  displayName: rh-push-to-registry-redhat-iotest
