@@ -1,0 +1,17 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: BuildPipelineSelector
+metadata:
+  name: build-pipeline-selector
+  namespace: dev-release-team-tenant
+spec:
+  selectors:
+    - name: Docker build
+      pipelineRef:
+        bundle: >-
+          quay.io/redhat-appstudio-tekton-catalog/pipeline-docker-build:eb5492a82d57efe60d00d41ddb0798f6b34fab2e
+        name: docker-build
+      when:
+        dockerfile: true
+      pipelineParams:
+        - name: build-source-image
+          value: 'true'

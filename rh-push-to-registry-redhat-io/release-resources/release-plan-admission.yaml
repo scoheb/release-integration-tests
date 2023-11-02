@@ -19,14 +19,17 @@ spec:
         value: pipelines/rh-push-to-registry-redhat-io/rh-push-to-registry-redhat-io.yaml
     resolver: "git"
   policy: rh-push-to-registry-redhat-io-test-policy
-  serviceAccount: release-service-account
+  serviceAccount: rh-push-to-registry-redhat-io-sa
   data:
     pyxis:
       server: stage
       secret: pyxis
     images:
-      addGitShaTag: true
+      floatingTag: "rh-product-prefix"
+      pushSourceContainer: false
     mapping:
       components:
         - name: rh-push-to-registry-redhat-iotest-component
-          repository: quay.io/hacbs-release-tests/rh-push-to-registry-redhat-iotest-component
+          repository: quay.io/redhat-pending/rhtap----rh-push-to-registry-redhat-iotest-component
+    sign:
+      configMapName: hacbs-signing-pipeline-config-redhatrelease2

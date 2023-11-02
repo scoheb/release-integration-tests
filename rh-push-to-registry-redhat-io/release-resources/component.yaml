@@ -3,7 +3,6 @@ kind: Component
 metadata:
   name: rh-push-to-registry-redhat-iotest-component
   annotations:
-    pipelinesascode: '1'
     image.redhat.com/generate: 'true'
 spec:
   application: rh-push-to-registry-redhat-iotest
