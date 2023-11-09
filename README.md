@@ -39,7 +39,7 @@
    2. **Run the script:** Execute the script using the command:
 
       ```sh
-      ./fbc-test.sh
+      ./test.sh
    3. **Monitor the Test Output:** The script will provide output indicating the progress of the test, including setup actions, waiting for pipeline runs, and checking the release status. One can also monitor the RHTAP-Stage Console.
 
 
