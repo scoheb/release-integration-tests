@@ -1,0 +1,26 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: EnterpriseContractPolicy
+metadata:
+  name: e2e-push-artifacts-policy
+  namespace: managed-release-team-tenant
+spec:
+  description: >-
+    Includes rules for levels 1, 2 & 3 of SLSA v0.1.
+  publicKey: "k8s://openshift-pipelines/public-key"
+  sources:
+    - data:
+        - github.com/release-engineering/rhtap-ec-policy//data
+        - oci::quay.io/redhat-appstudio-tekton-catalog/data-acceptable-bundles:latest
+      name: Default
+      policy:
+        - github.com/enterprise-contract/ec-policies//policy/lib
+        - github.com/enterprise-contract/ec-policies//policy/release
+  configuration:
+    include:
+      - '@slsa1'
+    exclude:
+      # Exclude step_image_registries for now since it can cause false
+      # positives due to https://issues.redhat.com/browse/OCPBUGS-8428
+      #- step_image_registries
+      #- builtin.attestation.signature_check
+      #- builtin.image.signature_check

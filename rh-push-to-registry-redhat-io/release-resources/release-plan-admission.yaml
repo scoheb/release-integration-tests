@@ -12,11 +12,11 @@ spec:
   pipelineRef:
     params:
       - name: url
-        value: https://github.com/redhat-appstudio/release-service-catalog.git
+        value: https://github.com/scoheb/release-service-catalog.git
       - name: revision
-        value: main
+        value: advisories
       - name: pathInRepo
-        value: pipelines/rh-push-to-registry-redhat-io/rh-push-to-registry-redhat-io.yaml
+        value: pipelines/scott/rh-push-to-registry-redhat-io.yaml
     resolver: "git"
   policy: rh-push-to-registry-redhat-io-test-policy
   serviceAccount: rh-push-to-registry-redhat-io-sa
@@ -33,3 +33,29 @@ spec:
           repository: quay.io/redhat-pending/rhtap----rh-push-to-registry-redhat-iotest-component
     sign:
       configMapName: hacbs-signing-pipeline-config-redhatrelease2
+    advisory:
+      repo: https://gitlab.cee.redhat.com/shebert/rhtap-advisories.git
+      spec:
+        product_id: 123
+        cpe: cpe:/a:example:openstack:el8
+        type: RHSA
+        content:
+          images:
+            - containerImage: quay.io/example/openstack@sha256:abcde
+              repository: rhosp16-rhel8/openstack
+              tags:
+                - latest
+              architecture: amd64
+              signingKey: abcde
+              purl: pkg:example/openstack@sha256:abcde?repository_url=quay.io/example/rhosp16-rhel8
+              cves:
+                fixed:
+                  CVE-2022-1234:
+                    components:
+                      - pkg:golang/golang.org/x/net/http2@1.11.1
+        synopsis: test synopsis
+        topic: test topic
+        description: test description
+        solution: test solution
+        references:
+          - https://docs.example.com/some/example/release-notes

@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+set -x
+
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 tmpDir=$(mktemp -d)
@@ -44,6 +46,7 @@ function prepareKubeconfigFiles() {
   api_server=${TOOLCHAIN_API_URL}/${WORKSPACE}
 
   export KUBECONFIG=${tmpDir}/kubeconfig
+  touch $KUBECONFIG
   oc login --token="${access_token}" --server="${api_server}" > /dev/null 2>&1
   oc project ${WORKSPACE_TENANT}  > /dev/null 2>&1
   if [ $? -ne 0 ]; then
@@ -53,4 +56,3 @@ function prepareKubeconfigFiles() {
   echo "${KUBECONFIG}"
 }
 prepareKubeconfigFiles
-

@@ -1,0 +1,9 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Release
+metadata:
+  generateName: push-artifacts-
+  namespace: dev-release-team-tenant
+spec:
+  gracePeriodDays: 7
+  releasePlan: e2e-push-artifacts-rp
+  snapshot: push-artifacts-7ngqn

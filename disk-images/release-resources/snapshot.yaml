@@ -1,0 +1,24 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Snapshot
+metadata:
+  generateName: disk-images-
+  namespace: dev-release-team-tenant
+  labels:
+    appstudio.openshift.io/component: test-component
+    test.appstudio.openshift.io/type: component
+spec:
+  application: e2e-disk-images-test-qa
+  artifacts: {}
+  components:
+    - containerImage: 'quay.io/scoheb/disk-image@sha256:ff12b464498034df5f725d024397729218f2bec482d0fe39facbfcf70a04009c'
+      name: test-component
+      source:
+        git:
+          revision: 3c6e23de2223445662ac86e60302cbec3b2b51f6
+          url: 'https://gitlab.com/scoheb/disk-image'
+    - containerImage: 'quay.io/scoheb/disk-image2@sha256:290ff561188c72db6261e2603d5c2c8daa3f399e95ce944ac553c166a6307f3a'
+      name: test-component2
+      source:
+        git:
+          revision: 3c6e23de2223445662ac86e60302cbec3b2b51f6
+          url: 'https://gitlab.com/scoheb/disk-image'

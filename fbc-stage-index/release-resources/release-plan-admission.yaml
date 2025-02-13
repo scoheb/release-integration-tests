@@ -20,6 +20,7 @@ spec:
         value: pipelines/fbc-release/fbc-release.yaml
   data:
     fbc:
+      stagedIndex: true
       fromIndex: 'registry-proxy.engineering.redhat.com/rh-osbs/iib-pub-pending:v4.13'
       targetIndex: ''
       binaryImage: 'registry.redhat.io/openshift4/ose-operator-registry:v4.12'

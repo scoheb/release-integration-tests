@@ -1,0 +1,11 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleasePlan
+metadata:
+  labels:
+    release.appstudio.openshift.io/auto-release: 'true'
+    release.appstudio.openshift.io/standing-attribution: 'true'
+  name: e2e-push-artifacts-rp
+  namespace: dev-release-team-tenant
+spec:
+  application: e2e-push-artifacts-test-qa
+  target: managed-release-team-tenant

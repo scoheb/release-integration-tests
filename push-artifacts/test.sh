@@ -1,11 +1,10 @@
 #!/usr/bin/env sh
-
+set -x
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-APPLICATION_NAME="rh-push-to-registry-redhat-iotest"
-COMPONENT_NAME="rh-push-to-registry-redhat-iotest-component"
-RELEASE_PLAN_NAME="rh-push-to-registry-redhat-io-test-rp"
-RELEASE_PLAN_ADMISSION_NAME="rh-push-to-registry-redhat-io-test-rpa"
+APPLICATION_NAME="e2e-push-artifacts-test-stage"
+RELEASE_PLAN_NAME="e2e-push-artifacts-rp"
+RELEASE_PLAN_ADMISSION_NAME="e2e-push-artifacts-rpa"
 # disable the use of this selector until we can figure out how to determine
 # the location of source containers when triggered via a simple pipeline
 #
@@ -49,12 +48,6 @@ function setup() {
 #    echo "Creating BuildPipelineSelector"
 #    kubectl apply -f release-resources/buildpipelineselector.yaml "${DEV_KUBECONFIG_ARG}"
 
-    echo "Creating Application"
-    kubectl apply -f release-resources/application.yaml "${DEV_KUBECONFIG_ARG}"
-
-    echo "Creating Component"
-    kubectl apply -f release-resources/component.yaml "${DEV_KUBECONFIG_ARG}"
-    
     echo "Creating ReleasePlan"
     kubectl apply -f release-resources/release-plan.yaml "${DEV_KUBECONFIG_ARG}"
 
@@ -67,23 +60,8 @@ function setup() {
 }
 
 function teardown() {
-
-    kubectl delete pr -l "appstudio.openshift.io/application=$APPLICATION_NAME,pipelines.appstudio.openshift.io/type=build,appstudio.openshift.io/component=$COMPONENT_NAME" "${DEV_KUBECONFIG_ARG}"
-    kubectl delete pr -l "appstudio.openshift.io/application=$APPLICATION_NAME,pipelines.appstudio.openshift.io/type=release" "${MANAGED_KUBECONFIG_ARG}"
     kubectl delete release "${DEV_KUBECONFIG_ARG}" -o=jsonpath="{.items[?(@.spec.releasePlan==\"$RELEASE_PLAN_NAME\")].metadata.name}"
     kubectl delete releaseplanadmission "$RELEASE_PLAN_ADMISSION_NAME" "${MANAGED_KUBECONFIG_ARG}"
-#
-#    disable the use of this selector until we can figure out how to determine
-#    the location of source containers when triggered via a simple pipeline
-#
-#    kubectl delete buildpipelineselector "${BUILD_PIPELINE_SELECTOR_NAME}" "${DEV_KUBECONFIG_ARG}"
-
-    if kubectl get application "$APPLICATION_NAME"  "${DEV_KUBECONFIG_ARG}" &> /dev/null; then
-        echo "Application $APPLICATION_NAME exists. Deleting..."
-        kubectl delete application "$APPLICATION_NAME" "${DEV_KUBECONFIG_ARG}"
-    else
-        echo "Application $APPLICATION_NAME does not exist."
-    fi
 }
 
 # Function to watch Build or Release PipelineRun and wait till succeeds.
@@ -92,7 +70,7 @@ function wait_for_pr_to_complete() {
     local type=$1
     local start_time=$(date +%s)
 
-    if [ "$type" = "release" ]; then
+    if [ "$type" = "managed" ]; then
         kube_config="${MANAGED_KUBECONFIG_ARG}"
         crd_labels="appstudio.openshift.io/application=$APPLICATION_NAME,pipelines.appstudio.openshift.io/type=$type"
     else
@@ -165,8 +143,7 @@ echo "Wait for build PipelineRun to finish"
 wait_for_pr_to_complete "build"
 
 echo "Wait for release PipelineRun to finish"
-set -x
-wait_for_pr_to_complete "release"
+wait_for_pr_to_complete "managed"
 
 echo "Waiting for the Release to be updated"
 sleep 15

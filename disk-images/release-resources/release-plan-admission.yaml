@@ -1,0 +1,72 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleasePlanAdmission
+metadata:
+  labels:
+    release.appstudio.openshift.io/auto-release: "true"
+  name: e2e-disk-images-rpa
+  namespace: managed-release-team-tenant
+spec:
+  applications:
+    - e2e-disk-images-test-qa
+  origin: dev-release-team-tenant
+  policy: e2e-disk-images-policy
+  pipeline:
+    pipelineRef:
+      resolver: git
+      params:
+        - name: url
+          value: "https://github.com/scoheb/release-service-catalog.git"
+        - name: revision
+          value: disk-image-pass-thru
+        - name: pathInRepo
+          value: pipelines/push-disk-images-to-cdn/push-disk-images-to-cdn.yaml
+    serviceAccountName: "release-service-account"
+    timeouts:
+      pipeline: "4h0m0s"
+  data:
+    cdn:
+      env: "stage"
+    pyxis:
+      server: stage
+      secret: pyxis
+    singleComponent: "true"
+    mapping:
+      components:
+        - name: test-component
+          staged:
+            destination: rhel-7-server-for-power-le-rhscl-isos__7_DOT_1__ppc64le
+            version: "1.1"
+            files:
+              - filename: test-component-{{ timestamp }}-noarch.txt
+                source: test-component.txt
+          contentGateway:
+            productName: "Konflux test product"
+            productCode: "K-Test-Product"
+            productVersionName: "KTestProduct 1"
+            filePrefix: "test-component"
+        - name: test-component2
+          staged:
+            destination: rhel-7-server-for-power-le-rhscl-isos__7_DOT_1__ppc64le
+            files:
+              - filename: test-component2-{{ timestamp }}-noarch.txt
+                source: test-component2.txt
+          contentGateway:
+            productName: "Konflux test product"
+            productCode: "K-Test-Product"
+            productVersionName: "KTestProduct 1"
+            filePrefix: "test-component"
+    sign:
+      configMapName: hacbs-signing-pipeline-config-redhatbeta2
+    releaseNotes:
+      product_id: 123
+      product_name: myname
+      product_version: myversion
+      product_stream: mystream
+      cpe: cpe:/a:example:openstack:el8
+      type: RHSA
+      synopsis: test synopsis
+      topic: test topic
+      description: test description
+      solution: test solution
+      references:
+        - https://docs.example.com/some/example/release-notes

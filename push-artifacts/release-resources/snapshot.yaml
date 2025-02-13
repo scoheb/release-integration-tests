@@ -1,0 +1,24 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Snapshot
+metadata:
+  generateName: push-artifacts-
+  namespace: dev-release-team-tenant
+  labels:
+    appstudio.openshift.io/component: test-component
+    test.appstudio.openshift.io/type: component
+spec:
+  application: e2e-push-artifacts-test-qa
+  artifacts: {}
+  components:
+    - containerImage: 'quay.io/scoheb/disk-image@sha256:a0c7a15acd80af3ddfe1fa30aca69299115b829ef0af9e201951b20f6321b09c'
+      name: test-component
+      source:
+        git:
+          revision: 3c6e23de2223445662ac86e60302cbec3b2b51f6
+          url: 'https://gitlab.com/scoheb/disk-image'
+    - containerImage: 'quay.io/scoheb/disk-image2@sha256:94a610561c68b393b74877c6e608f7f84653f4331251a9f2b5f07edf3e046dec'
+      name: test-component2
+      source:
+        git:
+          revision: 3c6e23de2223445662ac86e60302cbec3b2b51f6
+          url: 'https://gitlab.com/scoheb/disk-image'

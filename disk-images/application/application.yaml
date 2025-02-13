@@ -1,0 +1,11 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Application
+metadata:
+  name: e2e-disk-images-test-qa
+  namespace: dev-release-team-tenant
+spec:
+  appModelRepository:
+    url: ''
+  displayName: e2e-disk-images-test-qa
+  gitOpsRepository:
+    url: ''
